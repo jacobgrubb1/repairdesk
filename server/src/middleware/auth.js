@@ -42,4 +42,11 @@ function authorizeOrg(...roles) {
   };
 }
 
-module.exports = { authenticate, authorize, authorizeOrg };
+function authorizePlatform(req, res, next) {
+  if (req.user.platformRole !== 'platform_admin') {
+    return res.status(403).json({ error: 'Platform admin access required' });
+  }
+  next();
+}
+
+module.exports = { authenticate, authorize, authorizeOrg, authorizePlatform };

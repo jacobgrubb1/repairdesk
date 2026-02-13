@@ -9,13 +9,22 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     api.get('/auth/me')
-      .then(({ data }) => setUser(data))
+      .then(({ data }) => {
+        if (data.platform_role) data.platformRole = data.platform_role;
+        setUser(data);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   async function login(email, password) {
     const { data } = await api.post('/auth/login', { email, password });
+    setUser(data.user);
+    return data.user;
+  }
+
+  async function platformLogin(email, password) {
+    const { data } = await api.post('/auth/platform-login', { email, password });
     setUser(data.user);
     return data.user;
   }
@@ -28,7 +37,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, platformLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );

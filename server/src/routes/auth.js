@@ -27,6 +27,7 @@ async function generateTokens(user) {
     role: user.role,
     orgRole: user.org_role || null,
     orgId: store?.organization_id || null,
+    platformRole: user.platform_role || null,
   };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '15m',
@@ -94,7 +95,7 @@ router.post('/register', async (req, res, next) => {
     const emailData = templates.welcomeEmail({ name, verifyUrl });
     sendEmail({ to: email, ...emailData });
 
-    res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, platformRole: user.platform_role || null } });
   } catch (err) {
     next(err);
   }
@@ -133,10 +134,65 @@ router.post('/login', async (req, res, next) => {
     // Reset failed attempts on success
     await db.run('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
 
+    // Block login if store is disabled (except platform admins)
+    if (user.platform_role !== 'platform_admin') {
+      const store = await storeModel.findById(user.store_id);
+      if (store && store.is_active === false) {
+        return res.status(403).json({ error: 'Store has been disabled' });
+      }
+    }
+
     const tokens = await generateTokens(user);
     setCookies(res, tokens.accessToken, tokens.refreshToken);
 
-    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, storeId: user.store_id } });
+    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, storeId: user.store_id, platformRole: user.platform_role || null } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/platform-login
+router.post('/platform-login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const err = required(['email', 'password'], req.body);
+    if (err) return res.status(400).json({ error: err });
+
+    const user = await db.one('SELECT * FROM users WHERE email = $1', [email]);
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (user.is_active === 0) return res.status(403).json({ error: 'Account deactivated. Contact your administrator.' });
+
+    // Check lockout
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      return res.status(423).json({ error: 'Account temporarily locked. Please try again later.' });
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      const attempts = (user.failed_login_attempts || 0) + 1;
+      const updates = { failed_login_attempts: attempts };
+      if (attempts >= 5) {
+        updates.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      }
+      await db.run(
+        `UPDATE users SET failed_login_attempts = $1, locked_until = $2 WHERE id = $3`,
+        [updates.failed_login_attempts, updates.locked_until || null, user.id]
+      );
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Reset failed attempts on success
+    await db.run('UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1', [user.id]);
+
+    // Gate on platform admin role
+    if (user.platform_role !== 'platform_admin') {
+      return res.status(403).json({ error: 'Platform admin access required' });
+    }
+
+    const tokens = await generateTokens(user);
+    setCookies(res, tokens.accessToken, tokens.refreshToken);
+
+    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, storeId: user.store_id, platformRole: user.platform_role } });
   } catch (err) {
     next(err);
   }
@@ -155,7 +211,7 @@ router.post('/refresh', async (req, res, next) => {
     const tokens = await generateTokens(user);
     setCookies(res, tokens.accessToken, tokens.refreshToken);
 
-    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, storeId: user.store_id } });
+    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, storeId: user.store_id, platformRole: user.platform_role || null } });
   } catch {
     return res.status(401).json({ error: 'Invalid refresh token' });
   }

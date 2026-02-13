@@ -32,6 +32,7 @@ const suggestionRoutes = require('./routes/suggestions');
 const orgRoutes = require('./routes/org');
 const searchRoutes = require('./routes/search');
 const cannedResponseRoutes = require('./routes/cannedResponses');
+const platformRoutes = require('./routes/platform');
 const stripeWebhookRoute = require('./routes/stripeWebhook');
 
 const app = express();
@@ -92,6 +93,7 @@ app.use('/api', suggestionRoutes);
 app.use('/api/org', orgRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/canned-responses', cannedResponseRoutes);
+app.use('/api/platform', platformRoutes);
 
 // ---------------------------------------------------------------------------
 // Health check

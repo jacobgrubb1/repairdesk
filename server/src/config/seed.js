@@ -14,8 +14,8 @@ async function seed() {
     const userId = uuidv4();
     const passwordHash = await bcrypt.hash('admin123', 10);
     await db.run(
-      `INSERT INTO users (id, store_id, email, password_hash, name, role, email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, storeId, 'admin@repairdesk.com', passwordHash, 'Admin User', 'admin', 1]
+      `INSERT INTO users (id, store_id, email, password_hash, name, role, email_verified, platform_role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [userId, storeId, 'admin@repairdesk.com', passwordHash, 'Admin User', 'admin', 1, 'platform_admin']
     );
 
     const custId = uuidv4();

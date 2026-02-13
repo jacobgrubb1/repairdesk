@@ -34,7 +34,7 @@ api.interceptors.response.use(
         await axios.post('/api/auth/refresh', {}, { withCredentials: true });
         return api(original);
       } catch {
-        window.location.href = '/login';
+        window.location.href = window.location.pathname.startsWith('/platform') ? '/platform/login' : '/login';
       }
     }
     return Promise.reject(error);

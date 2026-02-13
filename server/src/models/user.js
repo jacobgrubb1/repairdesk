@@ -8,7 +8,7 @@ module.exports = {
 
   async findById(id) {
     return db.one(
-      'SELECT id, store_id, email, name, role, is_active, org_role, created_at FROM users WHERE id = $1',
+      'SELECT id, store_id, email, name, role, is_active, org_role, platform_role, created_at FROM users WHERE id = $1',
       [id]
     );
   },
