@@ -70,12 +70,25 @@ export default function TicketList() {
             </div>
             <div className="text-right text-sm text-gray-500 shrink-0 ml-4">
               <p>{t.final_cost ? `$${parseFloat(t.final_cost).toFixed(2)}` : t.estimated_cost ? `~$${parseFloat(t.estimated_cost).toFixed(2)}` : ''}</p>
+              {t.final_cost > 0 && (() => {
+                const paid = parseFloat(t.total_paid) || 0;
+                const cost = parseFloat(t.final_cost);
+                if (paid >= cost) return <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Paid</span>;
+                if (paid > 0) return <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">Partial</span>;
+                return <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Unpaid</span>;
+              })()}
               <p className="text-xs">{new Date(t.created_at).toLocaleDateString()}</p>
             </div>
           </Link>
         ))}
         {tickets.length === 0 && (
-          <p className="p-8 text-center text-gray-500">No tickets found</p>
+          <div className="p-12 text-center">
+            <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-gray-500 font-medium">No tickets yet</p>
+            <p className="text-gray-400 text-sm mt-1">Create your first repair ticket to get started</p>
+          </div>
         )}
       </div>
     </div>

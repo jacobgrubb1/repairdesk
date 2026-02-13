@@ -1,7 +1,12 @@
 const express = require('express');
 const ticketModel = require('../models/ticket');
+const paymentModel = require('../models/payment');
+const storeModel = require('../models/store');
 const { authenticate } = require('../middleware/auth');
 const { required } = require('../utils/validation');
+const { generateInvoice } = require('../utils/invoicePdf');
+const { sendEmail } = require('../utils/email');
+const { invoiceEmail } = require('../utils/emailTemplates');
 
 const router = express.Router();
 router.use(authenticate);
@@ -106,6 +111,7 @@ router.post('/:id/costs', async (req, res, next) => {
     const cost = await ticketModel.addCost(req.params.id, req.body);
     res.status(201).json(cost);
   } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
     next(err);
   }
 });
@@ -115,6 +121,72 @@ router.delete('/:id/costs/:costId', async (req, res, next) => {
   try {
     await ticketModel.deleteCost(req.params.costId, req.params.id);
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/tickets/:id/similar — find similar past repairs
+router.get('/:id/similar', async (req, res, next) => {
+  try {
+    const ticket = await ticketModel.findById(req.params.id, req.user.storeId);
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    const similar = await ticketModel.findSimilar(req.user.storeId, ticket);
+    res.json(similar);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/tickets/:id/invoice — download PDF
+router.get('/:id/invoice', async (req, res, next) => {
+  try {
+    const ticket = await ticketModel.findById(req.params.id, req.user.storeId);
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    const costs = await ticketModel.getCosts(req.params.id);
+    const payments = await paymentModel.findByTicket(req.params.id);
+    const store = await storeModel.findById(req.user.storeId);
+
+    const pdfBuffer = await generateInvoice(ticket, costs, payments, store);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="invoice-${ticket.ticket_number}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/tickets/:id/invoice/email — email PDF to customer
+router.post('/:id/invoice/email', async (req, res, next) => {
+  try {
+    const ticket = await ticketModel.findById(req.params.id, req.user.storeId);
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    if (!ticket.customer_email) return res.status(400).json({ error: 'Customer has no email address' });
+
+    const costs = await ticketModel.getCosts(req.params.id);
+    const payments = await paymentModel.findByTicket(req.params.id);
+    const store = await storeModel.findById(req.user.storeId);
+
+    const pdfBuffer = await generateInvoice(ticket, costs, payments, store);
+    const emailData = invoiceEmail({
+      customerName: ticket.customer_name,
+      ticketNumber: ticket.ticket_number,
+      storeName: store.name,
+    });
+
+    await sendEmail({
+      to: ticket.customer_email,
+      ...emailData,
+      attachments: [{
+        filename: `invoice-${ticket.ticket_number}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }],
+    });
+
+    res.json({ success: true, message: 'Invoice emailed to customer' });
   } catch (err) {
     next(err);
   }

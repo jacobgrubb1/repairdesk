@@ -1,0 +1,1193 @@
+================================================================================
+                    REPAIRDESK - COMPLETE TESTING GUIDE
+================================================================================
+
+Before you start, make sure the database migration is run:
+  - Run: 003_quantity.sql against your PostgreSQL database
+  - Start the server: node start-server.js
+  - Start the client: node start-client.js
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+  1.  SETUP & PREREQUISITES
+  2.  AUTHENTICATION & ACCOUNTS
+  3.  DASHBOARD
+  4.  TICKET CREATION (Full Flow)
+  5.  TICKET DETAIL PAGE
+  6.  STATUS WORKFLOW & CONFIRMATION DIALOGS
+  7.  NOTES & CANNED RESPONSES
+  8.  COST MANAGEMENT & PART QUANTITY
+  9.  INVENTORY STOCK VALIDATION
+  10. PAYMENT TRACKING
+  11. INVOICE & EMAIL
+  12. QUEUE BOARD (KANBAN)
+  13. TICKET LIST & PAYMENT BADGES
+  14. CUSTOMER MANAGEMENT
+  15. INVENTORY (PARTS TAB)
+  16. INVENTORY (SUPPLIERS TAB)
+  17. STORE SETTINGS (GENERAL TAB)
+  18. STORE SETTINGS (TEMPLATES TAB)
+  19. STORE SETTINGS (CANNED RESPONSES TAB)
+  20. KNOWLEDGE BASE
+  21. SIMILAR REPAIRS PANEL
+  22. PHOTOS & DOCUMENTATION
+  23. INTAKE CHECKLIST
+  24. SIGNATURES
+  25. TAGS
+  26. WARRANTIES
+  27. TRACKING PORTAL (PUBLIC)
+  28. CUSTOMER APPROVAL FLOW
+  29. STRIPE ONLINE PAYMENT
+  30. REPORTS & ANALYTICS
+  31. NOTIFICATIONS
+  32. GLOBAL SEARCH
+  33. STAFF MANAGEMENT
+  34. ORGANIZATION / MULTI-STORE
+  35. MOBILE RESPONSIVENESS
+  36. SECURITY FEATURES
+  37. END-TO-END WALK-IN SCENARIO
+
+================================================================================
+1. SETUP & PREREQUISITES
+================================================================================
+
+REQUIRED ENVIRONMENT VARIABLES (in server/.env):
+  NODE_ENV=development
+  PORT=3001
+  DATABASE_URL=postgresql://user:pass@localhost:5432/repairdesk
+  JWT_SECRET=your-secret-key-here
+  JWT_REFRESH_SECRET=your-refresh-secret-here
+  FRONTEND_URL=http://localhost:5173
+
+OPTIONAL (for email features):
+  SMTP_HOST=smtp.gmail.com
+  SMTP_PORT=587
+  SMTP_SECURE=false
+  SMTP_USER=your-email@gmail.com
+  SMTP_PASS=your-app-password
+  SMTP_FROM=RepairDesk <noreply@repairdesk.com>
+
+DATABASE SETUP:
+  1. Create a PostgreSQL database called "repairdesk"
+  2. Run: server/migrations/001_schema.sql
+  3. Run: server/migrations/002_stripe.sql
+  4. Run: server/migrations/003_quantity.sql
+
+START THE APP:
+  1. Open terminal in server folder, run: npm install && node start-server.js
+  2. Open terminal in client folder, run: npm install && node start-client.js
+  3. Open browser to http://localhost:5173
+
+
+================================================================================
+2. AUTHENTICATION & ACCOUNTS
+================================================================================
+
+TEST: Register a new account
+  1. Go to http://localhost:5173/register
+  2. Fill in: Store Name, Your Name, Email, Password
+  3. Click "Create Account"
+  4. EXPECTED: Redirected to login page with success message
+  5. If SMTP is configured: Check email for verification link
+
+TEST: Login
+  1. Go to http://localhost:5173/login
+  2. Enter the email and password from registration
+  3. Click "Sign In"
+  4. EXPECTED: Redirected to Dashboard
+
+TEST: Forgot Password
+  1. Go to http://localhost:5173/login
+  2. Click "Forgot password?"
+  3. Enter your email address
+  4. Click "Send Reset Link"
+  5. EXPECTED: Success message shown (email sent if SMTP configured)
+
+TEST: Invalid Login (Account Lock)
+  1. Try logging in with wrong password 5 times
+  2. EXPECTED: After 5 attempts, account is temporarily locked (15 minutes)
+
+TEST: Logout
+  1. Click "Sign out" at bottom of sidebar
+  2. EXPECTED: Redirected to login page
+
+
+================================================================================
+3. DASHBOARD
+================================================================================
+
+TEST: View Dashboard
+  1. After login, you should be on the Dashboard
+  2. EXPECTED: See 4 stat cards (Total Tickets, Completed, Revenue, Parts Cost)
+  3. EXPECTED: Month/Year selector in top right
+
+TEST: Month/Year Filter
+  1. Change the month dropdown to a different month
+  2. Change the year input
+  3. EXPECTED: Stats update to reflect the selected period
+
+TEST: Recent Tickets
+  1. EXPECTED: "Recent Tickets" panel shows last 5 tickets
+  2. Click on a ticket -> should navigate to ticket detail
+
+TEST: Low Stock Alerts (admin only)
+  1. EXPECTED: If any parts are below min quantity, red alert box appears
+  2. Click "View Inventory" link -> goes to inventory page
+
+TEST: Technician Performance (admin only)
+  1. EXPECTED: Table showing technician stats (tickets, completed, revenue, avg hours)
+
+TEST: Quick Links
+  1. EXPECTED: "Queue Board", "Reports", and "New Ticket" buttons at bottom
+  2. Click each -> should navigate correctly
+
+
+================================================================================
+4. TICKET CREATION (Full Flow)
+================================================================================
+
+TEST: Create a New Ticket
+  1. Click "New Ticket" in sidebar (or "+ New Ticket" button)
+  2. Select or create a customer:
+     - Type a customer name in the search box
+     - If new: click "Create new customer" and fill in name, email, phone
+  3. Fill in device info:
+     - Device Type: e.g., "Phone"
+     - Brand: e.g., "Apple"
+     - Model: e.g., "iPhone 14"
+  4. Issue Description: e.g., "Cracked screen, touch not responding"
+  5. Estimated Cost: e.g., "150"
+  6. Accessories: e.g., "Charger, case"
+  7. Optionally toggle "Notify customer of updates"
+  8. Click "Create Ticket"
+  9. EXPECTED: Redirected to the new ticket's detail page
+  10. EXPECTED: Ticket number auto-assigned (e.g., #1)
+  11. EXPECTED: Status starts at "intake"
+
+
+================================================================================
+5. TICKET DETAIL PAGE
+================================================================================
+
+TEST: View Ticket Details
+  1. Navigate to a ticket (click from list or dashboard)
+  2. EXPECTED: See header with ticket #, customer name, device info
+  3. EXPECTED: Status buttons row
+  4. EXPECTED: Issue description displayed
+  5. EXPECTED: Diagnosis text area (editable)
+  6. EXPECTED: Sidebar with: Details, Costs, Payments, Warranty, Tracking Link,
+     Invoice, Similar Repairs (if any), Feedback
+
+TEST: Edit Diagnosis
+  1. Type in the Diagnosis text area
+  2. Click away (blur)
+  3. EXPECTED: Diagnosis saved (refresh page to confirm)
+
+TEST: Edit Accessories
+  1. In sidebar Details section, edit the Accessories field
+  2. Click away (blur)
+  3. EXPECTED: Accessories updated
+
+TEST: Assign Technician (admin only)
+  1. In sidebar Details, use the "Assigned to" dropdown
+  2. Select a technician
+  3. EXPECTED: Assignment saved, technician receives notification
+
+TEST: Toggle Customer Notifications
+  1. In sidebar Details, toggle "Notify customer" checkbox
+  2. EXPECTED: Setting saved (customer will/won't get email updates)
+
+TEST: Print Work Order
+  1. Click "Print Work Order" button
+  2. EXPECTED: Print-friendly work order view loads
+  3. Click "Print" to test print dialog
+  4. Click "Back" to return
+
+TEST: Print Receipt
+  1. Click "Print Receipt" button
+  2. EXPECTED: Print-friendly receipt view loads
+  3. Click "Back" to return
+
+
+================================================================================
+6. STATUS WORKFLOW & CONFIRMATION DIALOGS
+================================================================================
+
+TEST: Change Status (normal)
+  1. On ticket detail, click "diagnosing" status button
+  2. EXPECTED: Status changes immediately (no confirmation needed)
+
+TEST: Change Status to "completed" (requires confirmation)
+  1. Click "completed" status button
+  2. EXPECTED: Confirmation modal appears:
+     "Are you sure you want to change this ticket to completed?"
+     "This will mark the repair as complete."
+  3. Click "Confirm"
+  4. EXPECTED: Status changes to completed, completed_at timestamp set
+
+TEST: Change Status to "cancelled" (requires confirmation)
+  1. Click "cancelled" status button
+  2. EXPECTED: Confirmation modal appears with warning
+  3. Click "Cancel" to abort
+  4. EXPECTED: Status remains unchanged
+
+TEST: Change Status to "picked_up" (requires confirmation)
+  1. Click "picked_up" status button
+  2. EXPECTED: Confirmation modal with message about customer pickup
+  3. Click "Confirm"
+  4. EXPECTED: Status changes
+
+TEST: Approval Workflow
+  1. Set ticket to "awaiting_approval" status
+  2. EXPECTED: Orange approval banner appears at top
+  3. Shows estimated cost and current costs
+  4. (Admin) Click "Approve" -> status moves to "in_repair"
+  5. OR Click "Reject" -> textarea appears for reason -> status back to "diagnosing"
+
+
+================================================================================
+7. NOTES & CANNED RESPONSES
+================================================================================
+
+TEST: Add a Note
+  1. On ticket detail, scroll to Notes section
+  2. Type a message in the note input
+  3. Click "Add Note"
+  4. EXPECTED: Note appears in timeline with your name and timestamp
+
+TEST: Add Internal Note
+  1. Check the "Internal" checkbox before adding a note
+  2. Click "Add Note"
+  3. EXPECTED: Note shows with yellow "Internal" badge
+  4. Internal notes are NOT visible to customers on tracking portal
+
+TEST: Use Canned Response
+  1. In the note form, look for the canned response dropdown
+  2. Select a canned response (if any exist - create them first in Store Settings)
+  3. EXPECTED: Note content auto-fills with the canned response text
+  4. Edit if needed, then click "Add Note"
+
+
+================================================================================
+8. COST MANAGEMENT & PART QUANTITY
+================================================================================
+
+TEST: Add a Part Cost with Quantity
+  1. On ticket detail sidebar, find the Costs section
+  2. Click "+ Add cost"
+  3. Select cost type: "part"
+  4. Click "Link inventory part"
+  5. Search for a part (type at least 2 characters)
+  6. Select a part from the dropdown
+  7. EXPECTED: Description and amount auto-fill with part name and sell price
+  8. EXPECTED: Quantity field appears showing "Qty: 1"
+  9. EXPECTED: Shows "x $XX.XX = $XX.XX" calculation
+  10. Change quantity to 3
+  11. EXPECTED: Amount auto-recalculates (unit price x 3)
+  12. Click "Add"
+  13. EXPECTED: Cost appears in list showing "3 x $XX.XX = $XX.XX"
+  14. EXPECTED: Total updates
+  15. EXPECTED: Inventory quantity decreases by 3
+
+TEST: Add a Labor Cost
+  1. Click "+ Add cost"
+  2. Select cost type: "labor"
+  3. Enter description: "Screen replacement labor"
+  4. Enter hours: 1.5
+  5. Enter rate: 50
+  6. EXPECTED: Shows calculated amount "= $75.00"
+  7. Click "Add"
+  8. EXPECTED: Cost shows "1.5hrs @ $50.00/hr = $75.00"
+
+TEST: Add an "Other" Cost
+  1. Click "+ Add cost"
+  2. Select cost type: "other"
+  3. Enter description: "Diagnostic fee"
+  4. Enter amount: 25
+  5. Click "Add"
+  6. EXPECTED: Cost appears with $25.00
+
+TEST: Delete a Cost
+  1. Click the "x" button next to a cost item
+  2. EXPECTED: Cost removed, total updates
+  3. If it was a part cost: inventory quantity restored
+
+TEST: Apply Template
+  1. Click "Apply template"
+  2. Select a template from the list (create one first in Store Settings > Templates)
+  3. EXPECTED: All template cost items are added to the ticket
+
+
+================================================================================
+9. INVENTORY STOCK VALIDATION
+================================================================================
+
+TEST: Out-of-Stock Prevention
+  1. Go to Inventory, find a part with 0 quantity (or set one to 0)
+  2. Go to a ticket, click "+ Add cost" > "Link inventory part"
+  3. Search for that part
+  4. EXPECTED: Part appears greyed out with "Out of stock" label
+  5. EXPECTED: Cannot click/select the out-of-stock part
+
+TEST: Insufficient Stock Error
+  1. Find a part with quantity = 2
+  2. On a ticket, add that part with quantity = 5
+  3. EXPECTED: Error message appears: "Insufficient stock: only 2 available, need 5"
+  4. EXPECTED: Cost is NOT added, inventory is NOT changed
+
+TEST: Stock Deduction Verification
+  1. Note a part's current quantity (e.g., 10)
+  2. Add that part to a ticket with quantity 3
+  3. Go to Inventory page
+  4. EXPECTED: Part quantity is now 7 (10 - 3)
+
+TEST: Stock Restoration on Delete
+  1. Delete the cost item you just added
+  2. Go to Inventory page
+  3. EXPECTED: Part quantity is back to 10
+
+
+================================================================================
+10. PAYMENT TRACKING
+================================================================================
+
+TEST: Record a Payment
+  1. On ticket detail sidebar, find the Payments section
+  2. EXPECTED: Shows total cost, amount paid, balance due
+  3. Enter amount: 50
+  4. Select method: "cash"
+  5. Enter note: "Deposit"
+  6. Click "Record Payment"
+  7. EXPECTED: Payment appears in list with date, amount, method
+  8. EXPECTED: "Paid" amount updates, balance decreases
+
+TEST: Record Multiple Payments
+  1. Record another payment for the remaining balance
+  2. EXPECTED: Balance shows $0.00 or "Fully Paid" indicator
+
+TEST: Pay Remaining Balance (Quick Button)
+  1. If there's a balance, look for "Pay remaining balance" button
+  2. Click it
+  3. EXPECTED: Amount auto-fills with remaining balance
+
+TEST: Overpayment
+  1. Record a payment larger than the balance
+  2. EXPECTED: Shows overpaid state
+
+
+================================================================================
+11. INVOICE & EMAIL
+================================================================================
+
+TEST: Download Invoice PDF
+  1. On ticket detail sidebar, find the Invoice section
+  2. Click "Download Invoice PDF"
+  3. EXPECTED: PDF opens in new tab/downloads
+  4. EXPECTED: PDF contains store info, customer info, cost breakdown, payments
+
+TEST: Email Invoice to Customer
+  1. Click "Email Invoice to Customer"
+  2. EXPECTED: If SMTP configured: invoice emailed, success toast appears
+  3. EXPECTED: If no SMTP: error toast appears
+  4. EXPECTED: If customer has no email: error "Customer has no email address"
+
+
+================================================================================
+12. QUEUE BOARD (KANBAN)
+================================================================================
+
+TEST: View Queue Board
+  1. Click "Queue Board" in sidebar
+  2. EXPECTED: 5 columns: Intake, Diagnosing, Awaiting Approval, In Repair, Completed
+  3. EXPECTED: Each column shows ticket count
+  4. EXPECTED: Tickets shown as cards with #, customer, device, cost
+
+TEST: Drag and Drop
+  1. Grab a ticket card and drag it to another column
+  2. EXPECTED: Card moves to new column immediately (optimistic update)
+  3. EXPECTED: Ticket status updates in the database
+
+TEST: Payment Badges on Cards
+  1. Look at tickets that have costs
+  2. EXPECTED: Cards show payment badge:
+     - Green "Paid" if fully paid
+     - Yellow "Partial" if partially paid
+     - Red "Unpaid" if nothing paid
+
+TEST: Refresh
+  1. Click "Refresh" button
+  2. EXPECTED: Board reloads with latest data
+
+TEST: Click Ticket Number
+  1. Click a ticket # link on a card
+  2. EXPECTED: Navigates to ticket detail page
+
+
+================================================================================
+13. TICKET LIST & PAYMENT BADGES
+================================================================================
+
+TEST: View Ticket List
+  1. Click "Tickets" in sidebar
+  2. EXPECTED: List of all tickets sorted by newest first
+  3. Each row shows: ticket #, status badge, customer, device, cost, date
+
+TEST: Payment Badges
+  1. EXPECTED: Tickets with costs show payment status:
+     - Green "Paid" badge
+     - Yellow "Partial" badge
+     - Red "Unpaid" badge
+
+TEST: Search Tickets
+  1. Type in the search box (customer name, ticket #, device, issue)
+  2. EXPECTED: List filters in real-time
+
+TEST: Filter by Status
+  1. Use the status dropdown
+  2. Select "in_repair"
+  3. EXPECTED: Only in-repair tickets shown
+
+TEST: Click Ticket
+  1. Click any ticket row
+  2. EXPECTED: Navigate to ticket detail
+
+
+================================================================================
+14. CUSTOMER MANAGEMENT
+================================================================================
+
+TEST: View Customer List
+  1. Click "Customers" in sidebar
+  2. EXPECTED: List of all customers with name, email, phone
+
+TEST: Search Customers
+  1. Type in search box
+  2. EXPECTED: Filters by name, email, or phone
+
+TEST: View Customer Detail
+  1. Click a customer row
+  2. EXPECTED: Customer detail page shows contact info
+  3. EXPECTED: Ticket history for that customer displayed
+
+TEST: Edit Customer
+  1. On customer detail, edit name/email/phone fields
+  2. Save changes
+  3. EXPECTED: Customer info updated
+
+
+================================================================================
+15. INVENTORY (PARTS TAB)
+================================================================================
+
+TEST: View Parts Inventory
+  1. Click "Inventory" in sidebar
+  2. EXPECTED: "Parts" tab is selected by default
+  3. EXPECTED: Table with columns: Name, SKU, Category, Supplier, Cost, Sell,
+     Margin, Qty, Min, Actions
+
+TEST: Add a New Part
+  1. Click "+ Add Part"
+  2. Fill in: Part Name, SKU, Category, Supplier, Cost Price, Sell Price,
+     Quantity, Min Quantity
+  3. Click "Add Part"
+  4. EXPECTED: Part appears in table
+
+TEST: Edit a Part
+  1. Click on a part row
+  2. EXPECTED: Inline edit form expands below the row
+  3. Change some values
+  4. Click "Save Changes"
+  5. EXPECTED: Part updated in table
+
+TEST: Restock a Part
+  1. Click "Restock" button on a part row
+  2. EXPECTED: Inline restock form appears
+  3. Enter quantity: 10
+  4. Enter note: "Monthly restock order"
+  5. Click "Confirm"
+  6. EXPECTED: Part quantity increases by 10
+
+TEST: Delete a Part (admin only)
+  1. Click "Delete" on a part row
+  2. EXPECTED: Confirmation dialog
+  3. Click OK
+  4. EXPECTED: Part removed
+
+TEST: Search Parts
+  1. Type in the search box
+  2. EXPECTED: Filters by name or SKU
+
+TEST: Filter by Category
+  1. Use category dropdown
+  2. EXPECTED: Only parts in that category shown
+
+TEST: Low Stock Filter
+  1. Check "Low Stock Only" checkbox
+  2. EXPECTED: Only parts where quantity <= min_quantity shown
+  3. EXPECTED: These rows have red background highlight
+
+TEST: Margin Calculation
+  1. EXPECTED: Margin column shows percentage
+  2. Example: Cost $50, Sell $100 -> Margin 50.0%
+
+
+================================================================================
+16. INVENTORY (SUPPLIERS TAB)
+================================================================================
+
+TEST: Switch to Suppliers Tab
+  1. On Inventory page, click "Suppliers" tab
+  2. EXPECTED: Tab switches, shows supplier table
+
+TEST: Add a Supplier
+  1. Click "+ Add Supplier"
+  2. Fill in: Company Name, Contact Name, Email, Phone, Address
+  3. Click "Add Supplier"
+  4. EXPECTED: Supplier appears in table
+
+TEST: Edit a Supplier
+  1. Click on a supplier row
+  2. EXPECTED: Inline edit form expands
+  3. Change some fields
+  4. Click "Save Changes"
+  5. EXPECTED: Supplier updated
+
+TEST: Delete a Supplier
+  1. Click "Delete" on a supplier
+  2. Confirm deletion
+  3. EXPECTED: Supplier removed
+
+TEST: Search Suppliers
+  1. Type in search box
+  2. EXPECTED: Filters by name, contact, email, etc.
+
+TEST: Verify No Separate Suppliers Page
+  1. Check sidebar - there should be NO "Suppliers" nav item
+  2. Suppliers are now managed ONLY under Inventory > Suppliers tab
+
+
+================================================================================
+17. STORE SETTINGS (GENERAL TAB)
+================================================================================
+
+TEST: View Store Settings
+  1. Click "Store Settings" in sidebar (admin only)
+  2. EXPECTED: Page loads with "General" tab selected
+  3. EXPECTED: Tabs shown: General | Templates | Canned Responses
+
+TEST: Edit Store Info
+  1. Change Store Name, Address, Phone, Email
+  2. Click "Save Settings"
+  3. EXPECTED: Success toast "Settings saved successfully"
+
+TEST: Upload Logo
+  1. In Store Logo section, click "Click to upload image"
+  2. Select an image file (under 2MB)
+  3. EXPECTED: Logo preview appears
+  4. Click "Save Settings"
+  5. EXPECTED: Logo saved and shown
+
+TEST: Set Tax Rate
+  1. Under Financial Settings, set Tax Rate to 8.5
+  2. Save
+  3. EXPECTED: Tax rate applied to receipts/invoices
+
+TEST: Configure Stripe Keys
+  1. Under Payment Integration, enter test Stripe keys
+  2. Save
+  3. EXPECTED: Keys saved (used for online payments on tracking portal)
+
+TEST: Warranty Settings
+  1. Set Default Warranty Period to 90 days
+  2. Enter Warranty Terms text
+  3. Save
+  4. EXPECTED: These defaults used when creating warranties
+
+TEST: Receipt Footer
+  1. Enter a custom receipt footer message
+  2. Save
+  3. EXPECTED: Footer appears on printed receipts
+
+
+================================================================================
+18. STORE SETTINGS (TEMPLATES TAB)
+================================================================================
+
+TEST: Switch to Templates Tab
+  1. On Store Settings page, click "Templates" tab
+  2. EXPECTED: Shows template management interface
+
+TEST: Create a Template
+  1. Click "+ New Template"
+  2. Enter name: "iPhone Screen Replacement"
+  3. Enter device type: "Phone"
+  4. Enter brand: "Apple"
+  5. Click "+ Add item"
+  6. Fill in: Description "Screen assembly", Type "part", Amount "89.99"
+  7. Click "+ Add item" again
+  8. Fill in: Description "Labor", Type "labor", Hours "1", Rate "65"
+  9. Click "Save Template"
+  10. EXPECTED: Template appears in list with items
+
+TEST: Edit a Template
+  1. Click "Edit" on an existing template
+  2. Modify an item or add a new one
+  3. Click "Save Template"
+  4. EXPECTED: Template updated
+
+TEST: Delete a Template
+  1. Click "Delete" on a template
+  2. EXPECTED: Template removed from list
+
+TEST: Verify No Separate Templates Page
+  1. Check sidebar - there should be NO "Templates" nav item
+  2. Templates are now managed ONLY under Store Settings > Templates tab
+
+
+================================================================================
+19. STORE SETTINGS (CANNED RESPONSES TAB)
+================================================================================
+
+TEST: Switch to Canned Responses Tab
+  1. On Store Settings page, click "Canned Responses" tab
+  2. EXPECTED: Shows canned responses management interface
+
+TEST: Create a Canned Response
+  1. Click "+ New Response"
+  2. Enter title: "Repair Complete"
+  3. Enter category: "Status Updates"
+  4. Enter content: "Your device has been repaired and is ready for pickup.
+     Please visit us at your earliest convenience."
+  5. Click "Save"
+  6. EXPECTED: Response appears in list with title and category badge
+
+TEST: Create More Responses
+  1. Create "Diagnosis Update":
+     "We've completed our diagnosis. The issue is [ISSUE].
+      The estimated repair cost is $[AMOUNT]. Please approve to proceed."
+  2. Create "Parts Ordered":
+     "We've ordered the necessary parts for your repair.
+      Expected arrival in 2-3 business days."
+
+TEST: Edit a Canned Response
+  1. Click "Edit" on a response
+  2. Modify the content
+  3. Click "Save"
+  4. EXPECTED: Response updated
+
+TEST: Delete a Canned Response
+  1. Click "Delete" on a response
+  2. EXPECTED: Response removed
+
+TEST: Use in Ticket Notes
+  1. Go to a ticket detail page
+  2. In the Notes section, look for the canned response dropdown
+  3. Select one of your created responses
+  4. EXPECTED: Content auto-fills in the note text area
+
+
+================================================================================
+20. KNOWLEDGE BASE
+================================================================================
+
+TEST: View Knowledge Base
+  1. Click "Knowledge Base" in sidebar
+  2. EXPECTED: List of completed repairs
+
+TEST: Search Knowledge Base
+  1. Type a search term (device name, issue keyword)
+  2. EXPECTED: Results filter to matching repairs
+
+TEST: Filter by Device Type
+  1. Use device type dropdown
+  2. EXPECTED: Only repairs for that device type shown
+
+TEST: Expand Repair Details
+  1. Click on a repair entry
+  2. EXPECTED: Expanded view shows diagnosis, parts used, notes, costs
+
+TEST: Pagination
+  1. If more than 20 entries, pagination controls appear
+  2. EXPECTED: Navigate between pages
+
+
+================================================================================
+21. SIMILAR REPAIRS PANEL
+================================================================================
+
+TEST: View Similar Repairs
+  1. Open a ticket for an iPhone (or any device with past completed repairs)
+  2. Look in the right sidebar
+  3. EXPECTED: "Similar Repairs" panel shows past completed/picked_up tickets
+     for the same device brand/model
+  4. Each entry shows: ticket #, status, device, diagnosis summary, cost
+
+TEST: Navigate to Similar Repair
+  1. Click on a similar repair entry
+  2. EXPECTED: Navigates to that ticket's detail page
+
+TEST: No Similar Repairs
+  1. Create a ticket for a unique device (e.g., "Samsung Galaxy Z Fold 99")
+  2. EXPECTED: Similar Repairs panel does not appear (no matches)
+
+
+================================================================================
+22. PHOTOS & DOCUMENTATION
+================================================================================
+
+TEST: Upload Photo
+  1. On ticket detail, find the Photos section
+  2. Click to upload a photo
+  3. Select an image file
+  4. EXPECTED: Photo appears in the gallery
+
+TEST: Photo Categories
+  1. Upload photos with different types (intake, repair, completion)
+  2. EXPECTED: Photos organized by type
+
+TEST: Delete Photo
+  1. Delete a photo
+  2. EXPECTED: Photo removed from gallery
+
+
+================================================================================
+23. INTAKE CHECKLIST
+================================================================================
+
+TEST: View Intake Checklist
+  1. On a ticket with a device type, find "Intake Checklist" section
+  2. EXPECTED: Checklist items appear based on device type
+
+TEST: Check/Uncheck Items
+  1. Toggle checklist items (e.g., "Power button works", "Screen intact")
+  2. EXPECTED: Items save their state
+
+TEST: Different Device Types
+  1. Create tickets with different device types (Phone, Laptop, Tablet)
+  2. EXPECTED: Different checklist items for each device type
+
+
+================================================================================
+24. SIGNATURES
+================================================================================
+
+TEST: Capture Intake Signature
+  1. On ticket detail, find the Signatures section
+  2. Draw a signature in the "Intake Signature" pad
+  3. Click Save
+  4. EXPECTED: Signature saved and displayed
+
+TEST: Capture Pickup Signature
+  1. When ticket is completed/picked_up
+  2. Draw signature in "Pickup Signature" pad
+  3. Click Save
+  4. EXPECTED: Signature saved
+
+TEST: Signatures on Receipt
+  1. Print receipt after signatures are captured
+  2. EXPECTED: Signatures appear on printed receipt
+
+
+================================================================================
+25. TAGS
+================================================================================
+
+TEST: Add Tags to a Ticket
+  1. On ticket detail, find the Tag Manager (below ticket header)
+  2. Click to add a tag
+  3. Create tags like: "Rush", "Warranty Claim", "VIP"
+  4. EXPECTED: Tags appear as colored badges
+
+TEST: Remove a Tag
+  1. Click the X on a tag badge
+  2. EXPECTED: Tag removed from ticket
+
+
+================================================================================
+26. WARRANTIES
+================================================================================
+
+TEST: Create Warranty
+  1. On ticket detail sidebar, find Warranty section
+  2. Create a warranty
+  3. EXPECTED: Warranty created with default period from Store Settings
+
+TEST: View Warranty Status
+  1. EXPECTED: Shows warranty start date, end date, and whether active/expired
+
+TEST: Check Warranty for a Customer
+  1. EXPECTED: Warranty information accessible and trackable
+
+
+================================================================================
+27. TRACKING PORTAL (PUBLIC)
+================================================================================
+
+TEST: Get Tracking Link
+  1. On ticket detail sidebar, find "Tracking Link" section
+  2. EXPECTED: Shows a link like http://localhost:5173/track/[uuid]
+  3. Copy the link
+
+TEST: Open Tracking Portal
+  1. Open the link in a new browser (or incognito window - no login needed!)
+  2. EXPECTED: Public tracking page loads with:
+     - Ticket status progress bar
+     - Device information
+     - Issue description
+     - Cost breakdown
+     - Payment summary with balance due
+     - Photos (if any)
+  3. EXPECTED: No login required - this is public
+
+TEST: Auto-Refresh
+  1. Leave the tracking portal open
+  2. Make a change to the ticket (e.g., change status) from the admin side
+  3. EXPECTED: Tracking portal updates within 30 seconds
+
+TEST: Mobile View
+  1. Open tracking link on a phone or resize browser to mobile width
+  2. EXPECTED: Layout adapts to mobile, everything readable
+
+
+================================================================================
+28. CUSTOMER APPROVAL FLOW
+================================================================================
+
+TEST: Full Approval Flow
+  1. Create a ticket, add some costs
+  2. Set status to "awaiting_approval"
+  3. Open the tracking portal link for that ticket
+  4. EXPECTED: Customer sees "Approval Needed" section with cost details
+  5. Customer clicks "Approve Repair"
+  6. EXPECTED: Status changes to "in_repair" on both portal and admin side
+
+TEST: Customer Rejection
+  1. Set another ticket to "awaiting_approval"
+  2. Open tracking portal
+  3. Click "Decline Repair"
+  4. Enter reason: "Too expensive"
+  5. Click submit
+  6. EXPECTED: Status returns to "diagnosing"
+  7. Check admin side: note added with rejection reason
+
+TEST: Customer Feedback (after completion)
+  1. Set a ticket to "completed" or "picked_up"
+  2. Open tracking portal
+  3. EXPECTED: Feedback form appears (star rating + comment)
+  4. Rate 5 stars, add comment: "Great service!"
+  5. Submit
+  6. EXPECTED: Feedback saved, visible on admin ticket detail page
+
+
+================================================================================
+29. STRIPE ONLINE PAYMENT
+================================================================================
+
+(Requires Stripe test keys configured in Store Settings)
+
+TEST: Pay Now Button
+  1. Configure Stripe keys in Store Settings > General > Payment Integration
+     - Use Stripe test keys (pk_test_... and sk_test_...)
+  2. Create a ticket with costs and an unpaid balance
+  3. Open the tracking portal for that ticket
+  4. EXPECTED: "Pay Now" button visible when balance > 0
+  5. Click "Pay Now"
+  6. EXPECTED: Redirected to Stripe Checkout page
+  7. Use test card: 4242 4242 4242 4242, any future expiry, any CVC
+  8. Complete payment
+  9. EXPECTED: Redirected back with success message
+  10. EXPECTED: Payment recorded with method "stripe"
+
+TEST: No Stripe Keys
+  1. Remove Stripe keys from Store Settings
+  2. Open tracking portal for a ticket with balance
+  3. EXPECTED: "Pay Now" button should NOT appear
+
+
+================================================================================
+30. REPORTS & ANALYTICS
+================================================================================
+
+TEST: View Reports Page
+  1. Click "Reports" in sidebar
+  2. EXPECTED: Detailed analytics page with multiple sections
+
+TEST: Monthly Summary
+  1. EXPECTED: Total tickets, completed, revenue, parts cost for selected month
+
+TEST: Revenue Trend
+  1. EXPECTED: 12-month revenue chart/data
+
+TEST: Top Customers
+  1. EXPECTED: List of top customers by total spend
+
+TEST: Device Type Breakdown
+  1. EXPECTED: Revenue breakdown by device type
+
+TEST: Turnaround Times
+  1. EXPECTED: Average time to complete repairs
+
+TEST: Payment Method Breakdown
+  1. EXPECTED: Breakdown of payments by method (cash, card, check, stripe)
+
+TEST: Inventory Report
+  1. EXPECTED: Inventory valuation data
+
+TEST: Change Month/Year
+  1. Use month/year filter
+  2. EXPECTED: All reports update to selected period
+
+
+================================================================================
+31. NOTIFICATIONS
+================================================================================
+
+TEST: Receive Notification
+  1. As admin, assign a ticket to a technician
+  2. Log in as that technician
+  3. EXPECTED: Notification bell in sidebar shows unread count
+
+TEST: View Notifications
+  1. Click the notification bell
+  2. EXPECTED: Dropdown shows notification messages
+
+TEST: Mark as Read
+  1. Click a notification
+  2. EXPECTED: Notification marked as read, count decreases
+
+TEST: Mark All as Read
+  1. Click "Mark all as read"
+  2. EXPECTED: All notifications cleared
+
+
+================================================================================
+32. GLOBAL SEARCH
+================================================================================
+
+TEST: Search from Header
+  1. Click the search bar in the top header
+  2. Type a customer name
+  3. EXPECTED: Results show matching tickets, customers, parts
+
+TEST: Search by Ticket Number
+  1. Type a ticket number (e.g., "1" or "42")
+  2. EXPECTED: Matching tickets appear
+
+TEST: Search by Part Name
+  1. Type a part name
+  2. EXPECTED: Matching inventory items appear
+
+TEST: Navigate from Search
+  1. Click a search result
+  2. EXPECTED: Navigates to the correct page
+
+
+================================================================================
+33. STAFF MANAGEMENT
+================================================================================
+
+TEST: View Staff List (admin only)
+  1. Click "Staff" in sidebar
+  2. EXPECTED: List of all staff members with name, email, role, status
+
+TEST: Create Staff Member
+  1. Click to add new staff
+  2. Enter: Name, Email, Password, Role (admin/technician/front_desk)
+  3. Save
+  4. EXPECTED: New staff member created
+
+TEST: Edit Staff Role
+  1. Change a staff member's role
+  2. EXPECTED: Role updated
+
+TEST: Deactivate Staff
+  1. Toggle a staff member's active status
+  2. EXPECTED: Deactivated user cannot log in
+
+
+================================================================================
+34. ORGANIZATION / MULTI-STORE
+================================================================================
+
+TEST: Create Organization (if not already created)
+  1. Click "Organization" in sidebar (admin only)
+  2. Set up organization name
+  3. EXPECTED: Organization dashboard loads
+
+TEST: View Org Dashboard
+  1. EXPECTED: Aggregate metrics across all stores
+  2. EXPECTED: Per-store breakdown (tickets, revenue, status)
+
+TEST: Add Store to Organization
+  1. Click to add a new store
+  2. Enter store details
+  3. EXPECTED: New store added under organization
+
+TEST: Switch Between Stores
+  1. In sidebar header, use the Store Switcher dropdown
+  2. EXPECTED: Context switches to selected store
+  3. EXPECTED: All data (tickets, inventory, etc.) shows for that store
+
+TEST: Transfer Ticket Between Stores (org_admin only)
+  1. On a ticket detail, look for "Transfer" button
+  2. Click it, select destination store
+  3. EXPECTED: Ticket moved to the other store
+
+
+================================================================================
+35. MOBILE RESPONSIVENESS
+================================================================================
+
+TEST: Mobile Sidebar
+  1. Resize browser to mobile width (< 768px)
+  2. EXPECTED: Sidebar disappears, hamburger menu appears top-left
+  3. Click hamburger -> sidebar slides in as overlay
+  4. Click a nav item -> sidebar closes, page navigates
+  5. Click backdrop (dark overlay) -> sidebar closes
+
+TEST: Mobile Dashboard
+  1. View dashboard on mobile
+  2. EXPECTED: Stat cards stack vertically
+  3. EXPECTED: Everything readable and usable
+
+TEST: Mobile Ticket Detail
+  1. View a ticket on mobile
+  2. EXPECTED: Main content stacks above sidebar content
+  3. EXPECTED: All sections accessible
+
+TEST: Mobile Queue Board
+  1. View queue board on mobile
+  2. EXPECTED: Columns are horizontally scrollable
+
+TEST: Mobile Tables
+  1. View inventory/supplier tables on mobile
+  2. EXPECTED: Tables are horizontally scrollable
+
+
+================================================================================
+36. SECURITY FEATURES
+================================================================================
+
+TEST: CSRF Protection
+  1. Try making an API call without the CSRF token
+  2. EXPECTED: Request rejected (403 Forbidden)
+
+TEST: Rate Limiting
+  1. Make many rapid requests to login endpoint
+  2. EXPECTED: After limit, requests return 429 Too Many Requests
+
+TEST: Protected Routes
+  1. Try accessing /api/tickets without being logged in
+  2. EXPECTED: 401 Unauthorized response
+
+TEST: Role-Based Access
+  1. Log in as a non-admin user
+  2. EXPECTED: Cannot see Staff, Store Settings, Suppliers nav items
+  3. EXPECTED: Cannot access admin-only API endpoints
+
+TEST: Cookie Security
+  1. Inspect browser cookies
+  2. EXPECTED: Auth cookies are httpOnly (not accessible via JavaScript)
+
+
+================================================================================
+37. END-TO-END WALK-IN SCENARIO
+================================================================================
+
+This tests the complete customer experience from walk-in to pickup:
+
+STEP 1: Customer Walks In
+  1. Click "New Ticket" in sidebar
+  2. Create new customer: "John Smith", "john@email.com", "555-1234"
+  3. Device: Phone / Apple / iPhone 14 Pro
+  4. Issue: "Cracked screen, phone gets hot, battery drains fast"
+  5. Estimated cost: 200
+  6. Accessories: "Charger, AirPods case"
+  7. Enable "Notify customer"
+  8. Create ticket
+
+STEP 2: Intake Process
+  1. On ticket detail, complete the intake checklist
+  2. Upload photos of the device (front, back, damage)
+  3. Capture intake signature
+  4. Add note: "Customer reports phone was dropped yesterday"
+
+STEP 3: Diagnosis
+  1. Change status to "diagnosing"
+  2. Check Similar Repairs panel for past iPhone repairs
+  3. Use Diagnosis Suggestions if available
+  4. Enter diagnosis: "Screen assembly cracked, battery swollen - both need replacement"
+  5. Add internal note: "Battery is the priority, may be a safety hazard"
+
+STEP 4: Add Costs
+  1. Click "+ Add cost" > Link inventory part
+  2. Search "screen" > select iPhone 14 Pro screen > Qty: 1
+  3. Add another part: search "battery" > select iPhone battery > Qty: 1
+  4. Add labor cost: "Screen + battery replacement", 2 hours @ $65/hr
+  5. VERIFY: Total cost calculated correctly
+  6. VERIFY: Inventory quantities decreased
+
+STEP 5: Request Approval
+  1. Change status to "awaiting_approval"
+  2. Copy the tracking link
+  3. Open in new incognito window (simulating customer)
+  4. CUSTOMER VIEW: See costs, click "Approve Repair"
+  5. VERIFY: Status changes to "in_repair"
+
+STEP 6: Repair
+  1. Back in admin view, verify status is "in_repair"
+  2. Add notes about repair progress
+  3. Upload completion photos
+
+STEP 7: Complete Repair
+  1. Click "completed" status button
+  2. Confirm in the dialog
+  3. VERIFY: completed_at timestamp set
+  4. Email the invoice to the customer
+
+STEP 8: Payment
+  1. Customer comes to pick up
+  2. In Payments section, record payment:
+     - Amount: full balance
+     - Method: card
+     - Note: "Visa ending 4242"
+  3. VERIFY: Payment badge shows "Paid"
+
+STEP 9: Pickup
+  1. Capture pickup signature
+  2. Click "picked_up" status button, confirm
+  3. VERIFY: Ticket shows picked_up status
+  4. Print receipt for the customer
+
+STEP 10: Post-Service
+  1. Customer opens tracking portal
+  2. VERIFY: Shows completed status, payment history, receipt info
+  3. Customer leaves feedback: 5 stars, "Excellent service!"
+  4. VERIFY: Feedback visible on admin ticket detail
+
+STEP 11: Verify Everything Connected
+  1. Dashboard: Revenue and ticket count updated for this month
+  2. Reports: New ticket reflected in monthly stats
+  3. Customer Detail: Ticket appears in customer's history
+  4. Inventory: Parts quantities decreased correctly
+  5. Knowledge Base: Completed repair searchable
+  6. Queue Board: Ticket no longer in active columns
+  7. Ticket List: Shows "Paid" badge and "picked_up" status
+
+================================================================================
+                         END OF TESTING GUIDE
+================================================================================
+
+QUICK REFERENCE - PAGES CONSOLIDATED:
+  - Suppliers -> now under Inventory > Suppliers tab
+  - Templates -> now under Store Settings > Templates tab
+  - Canned Responses -> now under Store Settings > Canned Responses tab
+
+QUICK REFERENCE - NEW FEATURES ADDED THIS SESSION:
+  - Part quantity field on costs (not just 1 anymore)
+  - Stock validation (can't use more than available)
+  - Status change confirmation dialogs (completed, cancelled, picked_up)
+  - Payment badges on ticket list and queue board (Paid/Partial/Unpaid)
+  - Similar Repairs panel in ticket detail sidebar
+  - Canned Responses management UI in Store Settings

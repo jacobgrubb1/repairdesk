@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import PriceSuggestion from '../components/PriceSuggestion';
 
 export default function TicketCreate() {
   const navigate = useNavigate();
@@ -12,14 +13,18 @@ export default function TicketCreate() {
     deviceModel: '',
     issueDescription: '',
     estimatedCost: '',
+    accessories: '',
+    notifyCustomer: false,
   });
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '' });
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [deviceTypes, setDeviceTypes] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     api.get('/customers').then(({ data }) => setCustomers(data));
+    api.get('/checklist/device-types').then(({ data }) => setDeviceTypes(data)).catch(() => {});
   }, []);
 
   async function handleCreateCustomer() {
@@ -101,13 +106,27 @@ export default function TicketCreate() {
         <div className="bg-white rounded-xl shadow-sm border p-4">
           <h2 className="font-semibold mb-3">Device</h2>
           <div className="grid grid-cols-3 gap-3">
-            <input placeholder="Type (e.g. Phone)" value={form.deviceType} onChange={(e) => setForm({ ...form, deviceType: e.target.value })}
-              className="border rounded-lg px-3 py-2 text-sm" />
+            <select value={form.deviceType} onChange={(e) => setForm({ ...form, deviceType: e.target.value })}
+              className="border rounded-lg px-3 py-2 text-sm">
+              <option value="">Select type...</option>
+              {deviceTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
             <input placeholder="Brand" value={form.deviceBrand} onChange={(e) => setForm({ ...form, deviceBrand: e.target.value })}
               className="border rounded-lg px-3 py-2 text-sm" />
             <input placeholder="Model" value={form.deviceModel} onChange={(e) => setForm({ ...form, deviceModel: e.target.value })}
               className="border rounded-lg px-3 py-2 text-sm" />
           </div>
+        </div>
+
+        {/* Accessories */}
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <h2 className="font-semibold mb-3">Accessories Received</h2>
+          <input
+            placeholder="Charger, case, SIM card, etc."
+            value={form.accessories}
+            onChange={(e) => setForm({ ...form, accessories: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
         </div>
 
         {/* Issue */}
@@ -128,10 +147,25 @@ export default function TicketCreate() {
             onChange={(e) => setForm({ ...form, estimatedCost: e.target.value })}
             className="mt-3 border rounded-lg px-3 py-2 text-sm w-48"
           />
+          <PriceSuggestion
+            deviceType={form.deviceType}
+            issueDescription={form.issueDescription}
+            onUseEstimate={(val) => setForm({ ...form, estimatedCost: val })}
+          />
+        </div>
+
+        {/* Notifications */}
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.notifyCustomer}
+              onChange={(e) => setForm({ ...form, notifyCustomer: e.target.checked })} />
+            Notify customer of status updates
+          </label>
         </div>
 
         <button type="submit" disabled={submitting}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center gap-2">
+          {submitting && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {submitting ? 'Creating...' : 'Create Ticket'}
         </button>
       </form>

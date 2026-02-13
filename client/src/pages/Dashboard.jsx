@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS_COLORS = {
   intake: 'bg-gray-100 text-gray-800',
@@ -13,15 +14,29 @@ const STATUS_COLORS = {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [report, setReport] = useState(null);
   const [recentTickets, setRecentTickets] = useState([]);
+  const [techPerf, setTechPerf] = useState(null);
+  const [myTickets, setMyTickets] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
 
   useEffect(() => {
     api.get(`/reports/monthly?month=${month}&year=${year}`).then(({ data }) => setReport(data));
-    api.get('/tickets?limit=5').then(({ data }) => setRecentTickets(data.slice(0, 5)));
+    api.get('/tickets').then(({ data }) => {
+      setRecentTickets(data.slice(0, 5));
+      // For technicians: filter to show their assigned tickets
+      if (user.role === 'technician') {
+        setMyTickets(data.filter(t => t.assigned_to === user.id && !['completed', 'picked_up', 'cancelled'].includes(t.status)));
+      }
+    });
+    if (user.role === 'admin') {
+      api.get(`/reports/tech-performance?month=${month}&year=${year}`).then(({ data }) => setTechPerf(data)).catch(() => {});
+      api.get('/parts/low-stock').then(({ data }) => setLowStock(data)).catch(() => {});
+    }
   }, [month, year]);
 
   const cards = report
@@ -58,6 +73,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Quick stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {cards.map((card) => (
           <div key={card.label} className="bg-white rounded-xl shadow-sm p-6 border">
@@ -66,6 +82,29 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Tech Quick Stats Bar (non-admin) */}
+      {user.role !== 'admin' && myTickets.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-8">
+          <h2 className="font-semibold text-blue-800 mb-3">My Queue ({myTickets.length} active)</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {myTickets.map(t => (
+              <Link key={t.id} to={`/tickets/${t.id}`}
+                className="bg-white rounded-lg border p-3 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-sm">#{t.ticket_number}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[t.status]}`}>
+                    {t.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <p className="text-sm">{t.customer_name}</p>
+                <p className="text-xs text-gray-500">{t.device_brand} {t.device_model}</p>
+                <p className="text-xs text-gray-400 truncate mt-1">{t.issue_description}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {report?.status_counts?.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6 border mb-8">
@@ -80,28 +119,106 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold">Recent Tickets</h2>
-          <Link to="/tickets" className="text-blue-600 text-sm hover:underline">View all</Link>
-        </div>
-        <div className="divide-y">
-          {recentTickets.map((t) => (
-            <Link key={t.id} to={`/tickets/${t.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50">
-              <div>
-                <span className="font-medium">#{t.ticket_number}</span>
-                <span className="ml-2 text-gray-600">{t.customer_name}</span>
-                <span className="ml-2 text-sm text-gray-400">{t.device_brand} {t.device_model}</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Recent tickets */}
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h2 className="font-semibold">Recent Tickets</h2>
+            <Link to="/tickets" className="text-blue-600 text-sm hover:underline">View all</Link>
+          </div>
+          <div className="divide-y">
+            {recentTickets.map((t) => (
+              <Link key={t.id} to={`/tickets/${t.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50">
+                <div>
+                  <span className="font-medium">#{t.ticket_number}</span>
+                  <span className="ml-2 text-gray-600">{t.customer_name}</span>
+                  <span className="ml-2 text-sm text-gray-400">{t.device_brand} {t.device_model}</span>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || ''}`}>
+                  {t.status.replace(/_/g, ' ')}
+                </span>
+              </Link>
+            ))}
+            {recentTickets.length === 0 && (
+              <div className="p-8 text-center">
+                <svg className="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p className="text-gray-400 text-sm">No tickets yet</p>
               </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[t.status] || ''}`}>
-                {t.status.replace(/_/g, ' ')}
-              </span>
-            </Link>
-          ))}
-          {recentTickets.length === 0 && (
-            <p className="p-4 text-gray-500 text-sm">No tickets yet</p>
-          )}
+            )}
+          </div>
         </div>
+
+      </div>
+
+      {/* Tech Performance (admin only) */}
+      {user.role === 'admin' && techPerf?.technicians?.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border mb-8">
+          <div className="p-4 border-b">
+            <h2 className="font-semibold">Technician Performance</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-gray-50">
+                <th className="text-left p-3">Technician</th>
+                <th className="text-right p-3">Tickets</th>
+                <th className="text-right p-3">Completed</th>
+                <th className="text-right p-3">Revenue</th>
+                <th className="text-right p-3">Avg Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {techPerf.technicians.map((t) => (
+                <tr key={t.id} className="border-b">
+                  <td className="p-3 font-medium">{t.name}</td>
+                  <td className="p-3 text-right">{t.total_tickets}</td>
+                  <td className="p-3 text-right">{t.completed_tickets}</td>
+                  <td className="p-3 text-right">${parseFloat(t.revenue).toFixed(2)}</td>
+                  <td className="p-3 text-right">{t.avg_completion_hours ? parseFloat(t.avg_completion_hours).toFixed(1) + 'h' : '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Low Stock Alerts (admin only) */}
+      {user.role === 'admin' && lowStock.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-red-800">Low Stock Alerts ({lowStock.length})</h2>
+            <Link to="/inventory" className="text-red-600 text-sm hover:underline">View Inventory</Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {lowStock.slice(0, 6).map(p => (
+              <div key={p.id} className="bg-white rounded-lg border border-red-100 p-3">
+                <p className="font-medium text-sm">{p.name}</p>
+                <p className="text-xs text-gray-500">{p.sku || 'No SKU'}</p>
+                <p className="text-sm mt-1">
+                  <span className="text-red-600 font-bold">{p.quantity}</span>
+                  <span className="text-gray-400"> / min {p.min_quantity}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick links */}
+      <div className="flex gap-3">
+        <Link to="/queue" className="bg-white border rounded-lg px-4 py-3 hover:shadow-md transition-shadow text-sm">
+          <span className="font-semibold">Queue Board</span>
+          <p className="text-xs text-gray-500">Drag & drop view</p>
+        </Link>
+        <Link to="/reports" className="bg-white border rounded-lg px-4 py-3 hover:shadow-md transition-shadow text-sm">
+          <span className="font-semibold">Reports</span>
+          <p className="text-xs text-gray-500">Detailed analytics</p>
+        </Link>
+        <Link to="/tickets/new" className="bg-blue-600 text-white rounded-lg px-4 py-3 hover:bg-blue-700 transition-colors text-sm">
+          <span className="font-semibold">New Ticket</span>
+          <p className="text-xs text-blue-200">Create repair ticket</p>
+        </Link>
       </div>
     </div>
   );

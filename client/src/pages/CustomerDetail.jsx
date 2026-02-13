@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/client';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const STATUS_COLORS = {
   intake: 'bg-gray-100 text-gray-800',
@@ -33,7 +34,7 @@ export default function CustomerDetail() {
     setEditing(false);
   }
 
-  if (!customer) return <p>Loading...</p>;
+  if (!customer) return <LoadingSpinner size="lg" className="py-12" />;
 
   return (
     <div className="max-w-3xl">
