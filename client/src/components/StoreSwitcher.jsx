@@ -3,24 +3,40 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function StoreSwitcher() {
-  const { user } = useAuth();
+  const { user, switchStore } = useAuth();
   const [stores, setStores] = useState([]);
   const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
-    if (user?.org_role) {
-      api.get('/org/stores').then(({ data }) => setStores(data)).catch(() => {});
+    if (user) {
+      api.get('/auth/my-stores').then(({ data }) => setStores(data)).catch(() => {});
     }
   }, [user]);
 
-  if (!user?.org_role || stores.length <= 1) return null;
+  if (!user || stores.length <= 1) return null;
 
-  const currentStore = stores.find(s => s.id === user.storeId) || stores[0];
+  const currentStore = stores.find(s => s.id === (user.storeId || user.store_id)) || stores[0];
+
+  async function handleSwitch(store) {
+    const storeId = store.id;
+    if (storeId === (user.storeId || user.store_id)) {
+      setOpen(false);
+      return;
+    }
+    setSwitching(true);
+    try {
+      await switchStore(storeId);
+    } catch {
+      setSwitching(false);
+    }
+  }
 
   return (
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
+        disabled={switching}
         className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 border rounded-lg px-2 py-1"
       >
         <span className="font-medium truncate max-w-[120px]">{currentStore?.name}</span>
@@ -33,18 +49,13 @@ export default function StoreSwitcher() {
           {stores.map(store => (
             <button
               key={store.id}
-              onClick={() => {
-                // Store switching requires re-authentication with a different store context
-                // For now, just show the store info
-                setOpen(false);
-                window.location.href = `/org`;
-              }}
+              onClick={() => handleSwitch(store)}
+              disabled={switching}
               className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                store.id === user.storeId ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
+                store.id === (user.storeId || user.store_id) ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
               }`}
             >
               <div>{store.name}</div>
-              <div className="text-xs text-gray-400">{store.active_tickets || 0} active tickets</div>
             </button>
           ))}
         </div>

@@ -19,6 +19,11 @@ module.exports = {
       `INSERT INTO users (id, store_id, email, password_hash, name, role, email_verified, verification_token) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [id, storeId, email, passwordHash, name, role, emailVerified || 0, verificationToken || null]
     );
+    // Auto-grant home store access
+    await db.run(
+      `INSERT INTO user_store_access (id, user_id, store_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [uuidv4(), id, storeId]
+    );
     return { id, store_id: storeId, email, name, role, is_active: 1 };
   },
 
@@ -49,6 +54,33 @@ module.exports = {
        FROM users u JOIN stores s ON u.store_id = s.id
        WHERE s.organization_id = $1 ORDER BY s.name, u.name`,
       [orgId]
+    );
+  },
+
+  async getStoreAccess(userId) {
+    return db.many(
+      `SELECT s.id, s.name FROM user_store_access usa JOIN stores s ON usa.store_id = s.id WHERE usa.user_id = $1 ORDER BY s.name`,
+      [userId]
+    );
+  },
+
+  async grantStoreAccess(userId, storeId, grantedBy) {
+    const id = uuidv4();
+    await db.run(
+      `INSERT INTO user_store_access (id, user_id, store_id, granted_by) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+      [id, userId, storeId, grantedBy || null]
+    );
+  },
+
+  async revokeStoreAccess(userId, storeId) {
+    // Prevent removing home store
+    const user = await this.findById(userId);
+    if (user && user.store_id === storeId) {
+      throw new Error('Cannot remove access to home store');
+    }
+    await db.run(
+      `DELETE FROM user_store_access WHERE user_id = $1 AND store_id = $2`,
+      [userId, storeId]
     );
   },
 };

@@ -125,6 +125,9 @@ function PartsTab({ suppliers }) {
   const [restockQty, setRestockQty] = useState('');
   const [restockNote, setRestockNote] = useState('');
 
+  const [historyId, setHistoryId] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+
   const loadParts = useCallback(() => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
@@ -231,6 +234,21 @@ function PartsTab({ suppliers }) {
       loadParts();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to restock');
+    }
+  }
+
+  async function toggleHistory(partId) {
+    if (historyId === partId) {
+      setHistoryId(null);
+      setHistoryData([]);
+      return;
+    }
+    try {
+      const { data } = await api.get(`/parts/${partId}`);
+      setHistoryId(partId);
+      setHistoryData(data.transactions || []);
+    } catch {
+      toast.error('Failed to load history');
     }
   }
 
@@ -344,6 +362,12 @@ function PartsTab({ suppliers }) {
                         >
                           Restock
                         </button>
+                        <button
+                          onClick={() => toggleHistory(part.id)}
+                          className="text-indigo-600 text-sm hover:underline"
+                        >
+                          History
+                        </button>
                         {isAdmin && (
                           <button onClick={() => handleDelete(part.id)}
                             className="text-red-500 text-sm hover:underline">
@@ -432,6 +456,62 @@ function PartsTab({ suppliers }) {
                             </button>
                           </div>
                         </form>
+                      </td>
+                    </tr>
+                  )}
+
+                  {historyId === part.id && (
+                    <tr className="border-b bg-indigo-50">
+                      <td colSpan={10} className="px-4 py-3">
+                        <div className="text-sm font-medium mb-2">Usage History — {part.name}</div>
+                        {historyData.length === 0 ? (
+                          <p className="text-sm text-gray-500">No history yet</p>
+                        ) : (
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-left text-gray-500 border-b">
+                                <th className="pb-1 pr-3">Type</th>
+                                <th className="pb-1 pr-3">Qty Change</th>
+                                <th className="pb-1 pr-3">Ticket</th>
+                                <th className="pb-1 pr-3">User</th>
+                                <th className="pb-1 pr-3">Date</th>
+                                <th className="pb-1">Note</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {historyData.map((tx, i) => (
+                                <tr key={tx.id || i} className="border-b border-indigo-100 last:border-0">
+                                  <td className="py-1.5 pr-3">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
+                                      tx.type === 'restock' ? 'bg-green-100 text-green-700' :
+                                      tx.type === 'used' ? 'bg-red-100 text-red-700' :
+                                      'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {tx.type}
+                                    </span>
+                                  </td>
+                                  <td className={`py-1.5 pr-3 font-medium ${
+                                    (tx.quantity_change || tx.quantityChange || 0) > 0 ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {(tx.quantity_change || tx.quantityChange || 0) > 0 ? '+' : ''}{tx.quantity_change || tx.quantityChange || 0}
+                                  </td>
+                                  <td className="py-1.5 pr-3">
+                                    {tx.ticket_id ? (
+                                      <a href={`/tickets/${tx.ticket_id}`} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                                        #{tx.ticket_number || tx.ticket_id.slice(0, 8)}
+                                      </a>
+                                    ) : '—'}
+                                  </td>
+                                  <td className="py-1.5 pr-3 text-gray-600">{tx.user_name || tx.userName || '—'}</td>
+                                  <td className="py-1.5 pr-3 text-gray-500">
+                                    {tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '—'}
+                                  </td>
+                                  <td className="py-1.5 text-gray-500">{tx.note || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </td>
                     </tr>
                   )}

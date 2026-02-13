@@ -250,6 +250,51 @@ router.get('/verify-email/:token', async (req, res, next) => {
   }
 });
 
+// POST /api/auth/switch-store
+router.post('/switch-store', authenticate, async (req, res, next) => {
+  try {
+    const { storeId } = req.body;
+    if (!storeId) return res.status(400).json({ error: 'storeId is required' });
+
+    // Verify user has access to target store
+    const access = await db.one(
+      'SELECT id FROM user_store_access WHERE user_id = $1 AND store_id = $2',
+      [req.user.id, storeId]
+    );
+    if (!access) return res.status(403).json({ error: 'You do not have access to this store' });
+
+    // Verify store exists and is active
+    const store = await storeModel.findById(storeId);
+    if (!store) return res.status(404).json({ error: 'Store not found' });
+    if (store.is_active === false) return res.status(403).json({ error: 'Store is disabled' });
+
+    // Update user's current store
+    await db.run('UPDATE users SET store_id = $1 WHERE id = $2', [storeId, req.user.id]);
+
+    // Re-fetch user and generate new tokens
+    const user = await db.one('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const tokens = await generateTokens(user);
+    setCookies(res, tokens.accessToken, tokens.refreshToken);
+
+    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, storeId: user.store_id, platformRole: user.platform_role || null } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/auth/my-stores
+router.get('/my-stores', authenticate, async (req, res, next) => {
+  try {
+    const stores = await db.many(
+      `SELECT s.id, s.name FROM user_store_access usa JOIN stores s ON usa.store_id = s.id WHERE usa.user_id = $1 ORDER BY s.name`,
+      [req.user.id]
+    );
+    res.json(stores);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/auth/forgot-password
 router.post('/forgot-password', async (req, res, next) => {
   try {

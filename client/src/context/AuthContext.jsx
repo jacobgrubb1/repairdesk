@@ -29,6 +29,12 @@ export function AuthProvider({ children }) {
     return data.user;
   }
 
+  async function switchStore(storeId) {
+    const { data } = await api.post('/auth/switch-store', { storeId });
+    setUser(data.user);
+    window.location.reload();
+  }
+
   async function logout() {
     try {
       await api.post('/auth/logout');
@@ -37,7 +43,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, platformLogin, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, platformLogin, switchStore, logout }}>
       {children}
     </AuthContext.Provider>
   );
