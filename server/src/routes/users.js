@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const userModel = require('../models/user');
 const { authenticate, authorize } = require('../middleware/auth');
-const { required, isValidEmail } = require('../utils/validation');
+const { required, isValidEmail, validatePassword } = require('../utils/validation');
 
 const router = express.Router();
 router.use(authenticate);
@@ -52,6 +52,27 @@ router.put('/:id', async (req, res, next) => {
     const user = await userModel.update(req.params.id, req.user.storeId, req.body);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/users/:id/password — admin reset someone's password
+router.put('/:id/password', async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Password is required' });
+    const pwErr = validatePassword(password);
+    if (pwErr) return res.status(400).json({ error: pwErr });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const db = require('../config/db');
+    const result = await db.run(
+      'UPDATE users SET password_hash = $1 WHERE id = $2 AND store_id = $3',
+      [passwordHash, req.params.id, req.user.storeId]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

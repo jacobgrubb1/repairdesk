@@ -61,7 +61,10 @@ export default function CustomerDetail() {
               <p className="text-gray-500">{customer.email || 'No email'} {customer.phone ? `| ${customer.phone}` : ''}</p>
               <p className="text-sm text-gray-400 mt-1">Customer since {new Date(customer.created_at).toLocaleDateString()}</p>
             </div>
-            <button onClick={() => setEditing(true)} className="border px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">Edit</button>
+            <div className="flex items-center gap-2">
+              <Link to={`/tickets/new?customerId=${id}`} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700">New Ticket</Link>
+              <button onClick={() => setEditing(true)} className="border px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50">Edit</button>
+            </div>
           </div>
         )}
       </div>

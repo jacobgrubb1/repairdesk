@@ -50,7 +50,7 @@ function SidebarContent({ user, location, logout, onNavClick }) {
             <NotificationBell />
           </div>
         </div>
-        {user?.org_role && <div className="mt-2"><StoreSwitcher /></div>}
+        <div className="mt-2"><StoreSwitcher /></div>
       </div>
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItems

@@ -18,6 +18,7 @@ router.get('/', async (req, res, next) => {
       status: req.query.status,
       search: req.query.search,
       customerId: req.query.customerId,
+      assignedTo: req.query.assignedTo,
     });
     res.json(tickets);
   } catch (err) {

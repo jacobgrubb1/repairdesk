@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 const STATUSES = ['', 'intake', 'diagnosing', 'awaiting_approval', 'in_repair', 'completed', 'picked_up', 'cancelled'];
 const STATUS_COLORS = {
@@ -13,17 +14,30 @@ const STATUS_COLORS = {
   cancelled: 'bg-red-100 text-red-800',
 };
 
+const ASSIGN_FILTERS = [
+  { value: '', label: 'All tickets' },
+  { value: 'mine', label: 'My tickets' },
+  { value: 'unassigned', label: 'Unassigned' },
+];
+
 export default function TicketList() {
+  const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [assignFilter, setAssignFilter] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (status) params.set('status', status);
+    if (assignFilter === 'mine' && user?.id) {
+      params.set('assignedTo', user.id);
+    } else if (assignFilter === 'unassigned') {
+      params.set('assignedTo', 'unassigned');
+    }
     api.get(`/tickets?${params}`).then(({ data }) => setTickets(data));
-  }, [search, status]);
+  }, [search, status, assignFilter, user]);
 
   return (
     <div>
@@ -49,6 +63,15 @@ export default function TicketList() {
           <option value="">All statuses</option>
           {STATUSES.filter(Boolean).map((s) => (
             <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+          ))}
+        </select>
+        <select
+          value={assignFilter}
+          onChange={(e) => setAssignFilter(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        >
+          {ASSIGN_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
       </div>
@@ -78,6 +101,9 @@ export default function TicketList() {
                 return <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Unpaid</span>;
               })()}
               <p className="text-xs">{new Date(t.created_at).toLocaleDateString()}</p>
+              {t.assigned_to_name && (
+                <p className="text-xs text-gray-400">{t.assigned_to_name}</p>
+              )}
             </div>
           </Link>
         ))}
@@ -86,8 +112,10 @@ export default function TicketList() {
             <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            <p className="text-gray-500 font-medium">No tickets yet</p>
-            <p className="text-gray-400 text-sm mt-1">Create your first repair ticket to get started</p>
+            <p className="text-gray-500 font-medium">No tickets found</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {search || status || assignFilter ? 'Try adjusting your filters' : 'Create your first repair ticket to get started'}
+            </p>
           </div>
         )}
       </div>

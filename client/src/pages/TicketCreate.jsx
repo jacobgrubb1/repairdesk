@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
 import PriceSuggestion from '../components/PriceSuggestion';
 
 export default function TicketCreate() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState({
-    customerId: '',
+    customerId: searchParams.get('customerId') || '',
     deviceType: '',
     deviceBrand: '',
     deviceModel: '',

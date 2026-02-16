@@ -12,6 +12,10 @@ export default function UserManagement() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'technician' });
   const [addingStoreFor, setAddingStoreFor] = useState(null);
+  const [resetPwFor, setResetPwFor] = useState(null);
+  const [resetPwValue, setResetPwValue] = useState('');
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [changePwForm, setChangePwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const { toast } = useToast();
 
   const isOrgAdmin = currentUser?.org_role === 'org_admin';
@@ -70,15 +74,68 @@ export default function UserManagement() {
     }
   }
 
+  async function handleResetPassword(userId) {
+    if (!resetPwValue) return;
+    try {
+      await api.put(`/users/${userId}/password`, { password: resetPwValue });
+      setResetPwFor(null);
+      setResetPwValue('');
+      toast.success('Password reset successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reset password');
+    }
+  }
+
+  async function handleChangeOwnPassword(e) {
+    e.preventDefault();
+    if (changePwForm.newPassword !== changePwForm.confirmPassword) {
+      return toast.error('New passwords do not match');
+    }
+    try {
+      await api.post('/auth/change-password', {
+        currentPassword: changePwForm.currentPassword,
+        newPassword: changePwForm.newPassword,
+      });
+      setChangePwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowChangePw(false);
+      toast.success('Password changed successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to change password');
+    }
+  }
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Staff Management</h1>
-        <button onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          {showForm ? 'Cancel' : '+ Add Staff'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowChangePw(!showChangePw)}
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+            {showChangePw ? 'Cancel' : 'Change My Password'}
+          </button>
+          <button onClick={() => setShowForm(!showForm)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            {showForm ? 'Cancel' : '+ Add Staff'}
+          </button>
+        </div>
       </div>
+
+      {showChangePw && (
+        <form onSubmit={handleChangeOwnPassword} className="bg-white rounded-xl shadow-sm border p-4 mb-6 space-y-3">
+          <h2 className="font-semibold">Change Your Password</h2>
+          <input type="password" placeholder="Current Password" value={changePwForm.currentPassword}
+            onChange={(e) => setChangePwForm({ ...changePwForm, currentPassword: e.target.value })}
+            required className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input type="password" placeholder="New Password" value={changePwForm.newPassword}
+            onChange={(e) => setChangePwForm({ ...changePwForm, newPassword: e.target.value })}
+            required className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input type="password" placeholder="Confirm New Password" value={changePwForm.confirmPassword}
+            onChange={(e) => setChangePwForm({ ...changePwForm, confirmPassword: e.target.value })}
+            required className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <p className="text-xs text-gray-400">Min 8 chars, must include uppercase, lowercase, and a number</p>
+          <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">Update Password</button>
+        </form>
+      )}
 
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-sm border p-4 mb-6 space-y-3">
@@ -120,12 +177,42 @@ export default function UserManagement() {
                     className="border rounded-lg px-2 py-1 text-sm">
                     {ROLES.map((r) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
                   </select>
+                  <button
+                    onClick={() => { setResetPwFor(resetPwFor === u.id ? null : u.id); setResetPwValue(''); }}
+                    className="px-3 py-1 rounded-lg text-sm bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
+                  >
+                    Reset PW
+                  </button>
                   <button onClick={() => toggleActive(u)}
                     className={`px-3 py-1 rounded-lg text-sm ${u.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
                     {u.is_active ? 'Deactivate' : 'Activate'}
                   </button>
                 </div>
               </div>
+
+              {resetPwFor === u.id && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="New password"
+                    value={resetPwValue}
+                    onChange={(e) => setResetPwValue(e.target.value)}
+                    className="border rounded-lg px-3 py-1.5 text-sm flex-1 max-w-xs"
+                  />
+                  <button
+                    onClick={() => handleResetPassword(u.id)}
+                    className="bg-yellow-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-yellow-700"
+                  >
+                    Set Password
+                  </button>
+                  <button
+                    onClick={() => { setResetPwFor(null); setResetPwValue(''); }}
+                    className="text-gray-500 text-sm hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
 
               {isOrgAdmin && u.storeAccess && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">

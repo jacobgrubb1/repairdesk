@@ -2,7 +2,7 @@ const db = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
-  async findByStore(storeId, { status, search, customerId } = {}) {
+  async findByStore(storeId, { status, search, customerId, assignedTo } = {}) {
     let query = `
       SELECT t.*, c.name as customer_name, c.phone as customer_phone,
              u1.name as created_by_name, u2.name as assigned_to_name,
@@ -24,6 +24,13 @@ module.exports = {
     if (customerId) {
       query += ` AND t.customer_id = $${idx}`;
       params.push(customerId);
+      idx++;
+    }
+    if (assignedTo === 'unassigned') {
+      query += ' AND t.assigned_to IS NULL';
+    } else if (assignedTo) {
+      query += ` AND t.assigned_to = $${idx}`;
+      params.push(assignedTo);
       idx++;
     }
     if (search) {

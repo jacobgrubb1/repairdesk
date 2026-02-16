@@ -295,6 +295,30 @@ router.get('/my-stores', authenticate, async (req, res, next) => {
   }
 });
 
+// POST /api/auth/change-password — user changes their own password
+router.post('/change-password', authenticate, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current password and new password are required' });
+
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) return res.status(400).json({ error: pwErr });
+
+    const user = await db.one('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.run('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, req.user.id]);
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/auth/forgot-password
 router.post('/forgot-password', async (req, res, next) => {
   try {
